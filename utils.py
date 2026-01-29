@@ -36,19 +36,23 @@ def reconstruct_path(parent: Dict[str, Optional[str]], goal: str) -> List[str]:
     path.reverse()
     return path
 
-def compute_total_cost(parent, goal, transfer_penalty):
-    total_cost = 0
-    prev_line = None
-    cur = goal
+def compute_total_cost(path, parent, goal, transfer_penalty):
+    if path is None:
+        print("No path found")
+    else:     
+        total_cost = 0
+        prev_line = None
+        cur = goal
 
-    while parent[cur] is not None:
-        prev, cost, line = parent[cur]
-        total_cost += cost
+        while parent[cur] is not None:
+            prev, cost, line = parent[cur]
+            total_cost += cost
 
-        if prev_line is not None and line != prev_line:
-            total_cost += transfer_penalty
+            if prev_line is not None and line != prev_line:
+                total_cost += transfer_penalty
 
-        prev_line = line
-        cur = prev
+            prev_line = line
+            cur = prev
 
-    return total_cost
+        print("Path:", " -> ".join(path))
+        print("Total cost (incl transfers):", total_cost)
