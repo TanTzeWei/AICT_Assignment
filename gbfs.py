@@ -8,6 +8,7 @@ def run_gbfs(adj, coords, start, goal, km_per_min=0.833):
 
     parent = {start: None}   # start has no parent
     visited = set()
+    expanded = 0
 
     while pq:
         _, node = heapq.heappop(pq)
@@ -15,6 +16,7 @@ def run_gbfs(adj, coords, start, goal, km_per_min=0.833):
         if node in visited:
             continue
         visited.add(node)
+        expanded += 1
 
         if node == goal:
             break
@@ -28,7 +30,7 @@ def run_gbfs(adj, coords, start, goal, km_per_min=0.833):
                 )
 
     if goal not in parent:
-        return None, None
+        return None, None, expanded
 
     # reconstruct path (compatible with parent storing tuples)
     path = []
@@ -42,4 +44,4 @@ def run_gbfs(adj, coords, start, goal, km_per_min=0.833):
             cur, _, _ = entry
     path.reverse()
 
-    return path, parent
+    return path, parent, expanded

@@ -12,6 +12,7 @@ def run_astar(adj, coords, start, goal, transfer_penalty, km_per_min=0.5):
     heapq.heappush(pq, (heuristic_minutes(coords, start, goal, km_per_min), start, None))
 
     best_goal_state = None
+    expanded = 0
 
     while pq:
         f, node, cur_line = heapq.heappop(pq)
@@ -21,6 +22,7 @@ def run_astar(adj, coords, start, goal, transfer_penalty, km_per_min=0.5):
         # (Not strictly required, but helps correctness with duplicates)
         if cur_state not in g:
             continue
+        expanded += 1
 
         if node == goal:
             best_goal_state = cur_state
@@ -43,7 +45,7 @@ def run_astar(adj, coords, start, goal, transfer_penalty, km_per_min=0.5):
                 heapq.heappush(pq, (new_cost + h, nxt, next_line))
 
     if best_goal_state is None:
-        return None, None
+        return None, None, expanded
 
     # 1) Reconstruct state path (node + line)
     state_path = []
@@ -87,4 +89,4 @@ def run_astar(adj, coords, start, goal, transfer_penalty, km_per_min=0.5):
             # If this happens, your adj list doesn't contain that edge as written
             return None, None
 
-    return path, parent_station
+    return path, parent_station, expanded

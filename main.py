@@ -4,6 +4,7 @@ from dfs import run_dfs
 from gbfs import run_gbfs
 from astar import run_astar
 from utils import compute_total_cost
+import time
 
 def algorithmMenu():
     print("--------------------------------------")
@@ -22,6 +23,13 @@ def modeMenu():
     print("1) Current")
     print("2) Future")
     print("--------------------------")
+
+def printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0):
+    t1 = time.perf_counter()
+    runtime_ms = (t1 - t0) * 1000
+    print(f"Runtime: {runtime_ms:.3f} ms")
+    print(f"Expanded nodes: {expanded}")
+    compute_total_cost(path, parent, goal_Station, transfer_Penalty)
 
 
 while True:
@@ -43,29 +51,36 @@ while True:
     goal_Station = input("Destination: ")
     print("-------------------------------------------------")
     transfer_Penalty = 5
+    t0 = time.perf_counter()
     if mode_option == 1:
+        if current_Station not in ADJ_LIST_CURRENT or goal_Station not in ADJ_LIST_CURRENT:
+            print("Invalid Station")
+            break
         if algorithm_option == 1:
-            path, parent = run_bfs(ADJ_LIST_CURRENT, current_Station, goal_Station)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_bfs(ADJ_LIST_CURRENT, current_Station, goal_Station)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
         elif algorithm_option == 2:
-            path, parent = run_dfs(ADJ_LIST_CURRENT, current_Station, goal_Station)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_dfs(ADJ_LIST_CURRENT, current_Station, goal_Station)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
         elif algorithm_option == 3:
-            path, parent = run_gbfs(ADJ_LIST_CURRENT, COORDS, current_Station, goal_Station)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_gbfs(ADJ_LIST_CURRENT, COORDS, current_Station, goal_Station)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
         elif algorithm_option == 4:
-            path, parent = run_astar(ADJ_LIST_CURRENT, COORDS, current_Station, goal_Station, transfer_Penalty)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_astar(ADJ_LIST_CURRENT, COORDS, current_Station, goal_Station, transfer_Penalty)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
     elif mode_option == 2:
+        if current_Station not in ADJ_LIST_FUTURE or goal_Station not in ADJ_LIST_FUTURE:
+            print("Invalid Station")
+            break
         if algorithm_option == 1:
-            path, parent = run_bfs(ADJ_LIST_FUTURE, current_Station, goal_Station)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_bfs(ADJ_LIST_FUTURE, current_Station, goal_Station)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
         elif algorithm_option == 2:
-            path, parent = run_dfs(ADJ_LIST_FUTURE, current_Station, goal_Station)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_dfs(ADJ_LIST_FUTURE, current_Station, goal_Station)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
         elif algorithm_option == 3:
-            path, parent = run_gbfs(ADJ_LIST_FUTURE, COORDS, current_Station, goal_Station)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_gbfs(ADJ_LIST_FUTURE, COORDS, current_Station, goal_Station)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)
         elif algorithm_option == 4:
-            path, parent = run_astar(ADJ_LIST_FUTURE, COORDS, current_Station, goal_Station, transfer_Penalty)
-            compute_total_cost(path, parent, goal_Station, transfer_Penalty)
+            path, parent, expanded = run_astar(ADJ_LIST_FUTURE, COORDS, current_Station, goal_Station, transfer_Penalty)
+            printResults(path, parent, goal_Station, transfer_Penalty, expanded, t0)

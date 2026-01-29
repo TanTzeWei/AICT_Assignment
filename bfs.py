@@ -3,9 +3,11 @@ def run_bfs(adj, start, goal):
     from collections import deque
     q = deque([start])
     parent = {start: None}
+    expanded = 0
 
     while q:
         node = q.popleft()
+        expanded += 1
         if node == goal:
             break
 
@@ -15,7 +17,7 @@ def run_bfs(adj, start, goal):
                 q.append(nxt)
 
     if goal not in parent:
-        return None, None
+        return None, None, expanded
 
     path = []
     cur = goal
@@ -27,4 +29,4 @@ def run_bfs(adj, start, goal):
         else:
             cur, _, _ = prev
 
-    return path[::-1], parent
+    return path[::-1], parent, expanded
