@@ -5,15 +5,16 @@ from pgmpy.inference import VariableElimination
 
 def build_model():
     # 1) Define structure (DAG)
+    # IMPORTANT: Since cpd_p uses evidence ["T","D","S"], the DAG MUST include T->P, D->P, S->P.
     model = DiscreteBayesianNetwork([
-        ("W", "P"),  # Weather -> Demand Proxy
-        ("T", "P"),  # Time of day -> Demand Proxy
-        ("D", "P"),  # Day type -> Demand Proxy
-        ("M", "P"),  # Network mode -> Demand Proxy
+        ("W", "S"),   # Weather -> Service Status
+        ("T", "P"),   # Time of Day -> Demand Proxy
+        ("D", "P"),   # Day Type -> Demand Proxy
+        ("S", "P"),   # Service Status -> Demand Proxy
 
-        ("P", "C"),  # Demand Proxy -> Crowding Risk
-        ("S", "C"),  # Service status -> Crowding Risk
-        ("M", "C"),  # Network mode -> Crowding Risk
+        ("P", "C"),   # Demand Proxy -> Crowding Risk
+        ("S", "C"),   # Service Status -> Crowding Risk
+        ("M", "C"),   # Network Mode -> Crowding Risk
     ])
 
     # 2) Define CPDs
@@ -22,14 +23,14 @@ def build_model():
     # Weather (W): Clear / Rainy / Thunderstorms
     cpd_w = TabularCPD(
         variable="W", variable_card=3,
-        values=[[0.60], [0.30], [0.10]],
+        values=[[0.50], [0.42], [0.08]],
         state_names={"W": ["Clear", "Rainy", "Thunderstorms"]}
     )
 
     # Time of Day (T): Morning / Afternoon / Evening
     cpd_t = TabularCPD(
         variable="T", variable_card=3,
-        values=[[0.35], [0.30], [0.35]],
+        values=[[0.25], [0.35], [0.40]],
         state_names={"T": ["Morning", "Afternoon", "Evening"]}
     )
 
@@ -43,137 +44,134 @@ def build_model():
     # Network Mode (M): Today / Future
     cpd_m = TabularCPD(
         variable="M", variable_card=2,
-        values=[[0.50], [0.50]],
+        values=[[0.85], [0.15]],
         state_names={"M": ["Today", "Future"]}
     )
 
     # Service Status (S): Normal / Reduced / Disrupted
+    # P(S | W)
     cpd_s = TabularCPD(
         variable="S", variable_card=3,
-        values=[[0.80], [0.15], [0.05]],
-        state_names={"S": ["Normal", "Reduced", "Disrupted"]}
+        values=[
+            # Evidence order: W = Clear, Rainy, Thunderstorms
+            [0.97, 0.92, 0.78],  # Normal
+            [0.02, 0.06, 0.15],  # Reduced
+            [0.01, 0.02, 0.07],  # Disrupted
+        ],
+        evidence=["W"],
+        evidence_card=[3],
+        state_names={
+            "S": ["Normal", "Reduced", "Disrupted"],
+            "W": ["Clear", "Rainy", "Thunderstorms"],
+        }
     )
 
     # Demand Proxy (P): Low / Medium / High
-    # P depends on W, T, D, M (3*3*2*2 = 36 columns).
-    #
-    # To get you started quickly, we’ll implement a simple rule-based generator:
-    # - base demand: Medium
-    # - Evening + Weekday => push higher
-    # - Weekend Afternoon => medium-high
-    # - Bad weather (Rainy/Thunderstorms) => slightly higher demand in stations (proxy)
-    # - Future mode => slightly spreads load (assume slightly lower high demand in some cases)
-    #
-    # This is "assumed but justified": you will later refine with sources or datasets.
-
-    w_states = ["Clear", "Rainy", "Thunderstorms"]
+    # P depends on T, D, S (3*2*3 = 18 columns).
     t_states = ["Morning", "Afternoon", "Evening"]
     d_states = ["Weekday", "Weekend"]
-    m_states = ["Today", "Future"]
+    s_states = ["Normal", "Reduced", "Disrupted"]
 
-    def demand_probs(w, t, d, m):
-        # Start with baseline
-        low, med, high = 0.25, 0.50, 0.25
+    # Evidence order: ["T","D","S"] with cards [3,2,3] => 18 columns
+    # Column order:
+    # for T in [Morning,Afternoon,Evening]:
+    #   for D in [Weekday,Weekend]:
+    #     for S in [Normal,Reduced,Disrupted]:
+    p_low = [
+        0.134, 0.101, 0.077,   # Morning, Weekday, (Normal/Reduced/Disrupted)
+        0.156, 0.117, 0.089,   # Morning, Weekend, (Normal/Reduced/Disrupted)
+        0.458, 0.386, 0.312,   # Afternoon, Weekday
+        0.525, 0.453, 0.375,   # Afternoon, Weekend
+        0.216, 0.174, 0.137,   # Evening, Weekday
+        0.258, 0.209, 0.165,   # Evening, Weekend
+    ]
 
-        # Time/Day effect
-        if t == "Evening" and d == "Weekday":
-            low, med, high = 0.15, 0.45, 0.40
-        elif t == "Morning" and d == "Weekday":
-            low, med, high = 0.20, 0.50, 0.30
-        elif t == "Afternoon" and d == "Weekend":
-            low, med, high = 0.20, 0.45, 0.35
+    p_med = [
+        0.272, 0.241, 0.213,
+        0.222, 0.196, 0.173,
+        0.305, 0.303, 0.288,
+        0.270, 0.266, 0.250,
+        0.417, 0.396, 0.357,
+        0.360, 0.340, 0.305,
+    ]
 
-        # Weather effect (proxy: more crowding potential during bad weather)
-        if w == "Rainy":
-            low -= 0.05
-            high += 0.05
-        elif w == "Thunderstorms":
-            low -= 0.08
-            high += 0.08
-
-        # Future mode effect (assume slightly better distribution/capacity)
-        if m == "Future":
-            high -= 0.03
-            med += 0.03
-
-        # Clamp and re-normalize
-        low = max(low, 0.01)
-        med = max(med, 0.01)
-        high = max(high, 0.01)
-        s = low + med + high
-        return [low / s, med / s, high / s]
-
-    # Build 36 columns in the exact pgmpy evidence order
-    columns = []
-    for w in w_states:
-        for t in t_states:
-            for d in d_states:
-                for m in m_states:
-                    columns.append(demand_probs(w, t, d, m))
-
-    # TabularCPD wants rows = states of P, columns = all evidence combinations.
-    # columns is list of [low, med, high] for each column; transpose it:
-    p_low = [col[0] for col in columns]
-    p_med = [col[1] for col in columns]
-    p_high = [col[2] for col in columns]
+    p_high = [
+        0.594, 0.658, 0.710,
+        0.622, 0.687, 0.738,
+        0.237, 0.311, 0.400,
+        0.205, 0.281, 0.375,
+        0.368, 0.430, 0.506,
+        0.382, 0.452, 0.530,
+    ]
 
     cpd_p = TabularCPD(
         variable="P", variable_card=3,
         values=[p_low, p_med, p_high],
-        evidence=["W", "T", "D", "M"],
-        evidence_card=[3, 3, 2, 2],
+        evidence=["T", "D", "S"],
+        evidence_card=[3, 2, 3],
         state_names={
             "P": ["Low", "Medium", "High"],
-            "W": w_states,
             "T": t_states,
             "D": d_states,
-            "M": m_states,
+            "S": s_states,
         }
     )
 
     # Crowding Risk (C): Low / Medium / High depends on P, S, M (3*3*2 = 18 columns).
     p_states = ["Low", "Medium", "High"]
     s_states = ["Normal", "Reduced", "Disrupted"]
+    m_states = ["Today", "Future"]
 
-    def crowding_probs(p, s, m):
-        # Baseline: if demand is low and service normal => low crowding likely
-        if p == "Low":
-            low, med, high = 0.70, 0.25, 0.05
-        elif p == "Medium":
-            low, med, high = 0.35, 0.50, 0.15
-        else:  # High demand
-            low, med, high = 0.15, 0.45, 0.40
+    # Evidence order: ["P","S","M"] with cards [3,3,2] => 18 columns
+    # Column order:
+    # for P in [Low,Medium,High]:
+    #   for S in [Normal,Reduced,Disrupted]:
+    #     for M in [Today,Future]:
 
-        # Service disruption pushes crowding up
-        if s == "Reduced":
-            low -= 0.10
-            high += 0.10
-        elif s == "Disrupted":
-            low -= 0.20
-            high += 0.20
+    c_low = [
+        # P=Low
+        0.85, 0.92,   # S=Normal, M=Today/Future
+        0.35, 0.15,   # S=Reduced
+        0.15, 0.01,   # S=Disrupted
+        # P=Medium
+        0.30, 0.55,
+        0.05, 0.15,
+        0.02, 0.01,
+        # P=High
+        0.05, 0.20,
+        0.00, 0.02,
+        0.00, 0.01,
+    ]
 
-        # Future mode: assume improved resilience/capacity around the corridor
-        if m == "Future":
-            high -= 0.05
-            med += 0.03
-            low += 0.02
+    c_med = [
+        # P=Low
+        0.14, 0.08,
+        0.50, 0.60,
+        0.35, 0.27,
+        # P=Medium
+        0.60, 0.40,
+        0.25, 0.60,
+        0.08, 0.27,
+        # P=High
+        0.35, 0.60,
+        0.10, 0.48,
+        0.02, 0.27,
+    ]
 
-        # Clamp and normalize
-        low = max(low, 0.01)
-        med = max(med, 0.01)
-        high = max(high, 0.01)
-        total = low + med + high
-        return [low / total, med / total, high / total]
-
-    c_cols = []
-    for p in p_states:
-        for s in s_states:
-            for m in m_states:
-                c_cols.append(crowding_probs(p, s, m))
-
-    c_low = [col[0] for col in c_cols]
-    c_med = [col[1] for col in c_cols]
-    c_high = [col[2] for col in c_cols]
+    c_high = [
+        # P=Low
+        0.01, 0.00,
+        0.15, 0.25,
+        0.50, 0.72,
+        # P=Medium
+        0.10, 0.05,
+        0.70, 0.25,
+        0.90, 0.72,
+        # P=High
+        0.60, 0.20,
+        0.90, 0.50,
+        0.98, 0.72,
+    ]
 
     cpd_c = TabularCPD(
         variable="C", variable_card=3,
@@ -184,7 +182,7 @@ def build_model():
             "C": ["Low", "Medium", "High"],
             "P": p_states,
             "S": s_states,
-            "M": m_states
+            "M": m_states,
         }
     )
 
@@ -200,10 +198,21 @@ def build_model():
 def infer_crowding(model, evidence: dict):
     infer = VariableElimination(model)
     result = infer.query(variables=["C"], evidence=evidence, show_progress=False)
-    return result["C"]
+    # pgmpy returns a DiscreteFactor for a single-variable query
+    return result
 
 
 if __name__ == "__main__":
     model = build_model()
-    dist = infer_crowding(model, evidence={"W": "Rainy", "T": "Evening", "D": "Weekday", "S": "Reduced", "M": "Today"})
+    print(model.check_model())
+    print(model.get_cpds("S"))
+    print(model.get_cpds("P"))
+    print(model.get_cpds("C"))
+
+    # Example 1: infer S from W (since S not provided)
+    dist = infer_crowding(model, evidence={"W": "Rainy", "T": "Evening", "D": "Weekday", "M": "Today"})
     print(dist)
+
+    # Example 2: force service advisory
+    dist2 = infer_crowding(model, evidence={"T": "Evening", "D": "Weekday", "S": "Reduced", "M": "Today"})
+    print(dist2)
