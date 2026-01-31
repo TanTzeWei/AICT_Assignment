@@ -1,9 +1,7 @@
-import sys
-sys.path.append('/mnt/user-data/uploads')
-
 from logic import *
 
 
+# Define all propositional symbols
 TODAY = Symbol("TODAY")
 FUTURE = Symbol("FUTURE")
 SUSP_TM_EX = Symbol("SUSP_TM_EX")
@@ -14,10 +12,12 @@ CLOSED_CA = Symbol("CLOSED_CA")
 CLOSED_T5 = Symbol("CLOSED_T5")
 USE_SB_T5 = Symbol("USE_SB_T5")
 USE_T5_TM = Symbol("USE_T5_TM")
+USE_PR_T5 = Symbol("USE_PR_T5")
 USE_EX_CA = Symbol("USE_EX_CA")
 USE_TM_EX = Symbol("USE_TM_EX")
 
 
+# Define individual rules for better tracking
 rules = {
     "R1": Implication(TODAY, Not(FUTURE)),
     "R2": Implication(TELE_ACTIVE, FUTURE),
@@ -26,15 +26,17 @@ rules = {
     "R5": Implication(SUSP_TM_EX, Not(USE_TM_EX)),
     "R6": Implication(CLOSED_T5, Not(USE_SB_T5)),
     "R7": Implication(TODAY, Not(USE_SB_T5)),
-    "R8": Implication(TODAY, Not(USE_T5_TM)),
+    "R8": Implication(TODAY, Not(USE_PR_T5)),
     "R9a": Implication(USE_SB_T5, TELE_ACTIVE),
     "R9b": Implication(USE_T5_TM, TELE_ACTIVE),
     "R10": Implication(CLOSED_CA, Not(USE_EX_CA))
 }
 
+# Combine all rules into knowledge base
 knowledge = And(*rules.values())
 
 
+# Define all scenarios
 scenarios = [
     {
         "num": 1,
@@ -88,11 +90,13 @@ scenarios = [
 
 
 def is_satisfiable(kb):
+    """Check if KB has at least one satisfying model"""
     symbols = kb.symbols()
     return try_find_model(kb, symbols, {})
 
 
 def try_find_model(kb, symbols, model):
+    """Try to find a satisfying model"""
     if not symbols:
         try:
             return kb.evaluate(model)
@@ -113,17 +117,21 @@ def try_find_model(kb, symbols, model):
 
 
 def find_violated_rules(scenario_facts):
+    """Find which rules are violated by the scenario"""
     violated = []
     
+    # Test each rule individually with scenario facts
     for rule_name, rule in rules.items():
         test_kb = And(rule, scenario_facts)
         if not is_satisfiable(test_kb):
             violated.append(rule_name)
     
+    # Special case: check for chains of implications
     symbols_dict = {}
     for symbol in scenario_facts.symbols():
         symbols_dict[symbol] = True
     
+    # Check R4 + R10 chain for WORKS_CHANGI
     if "WORKS_CHANGI" in symbols_dict and "USE_EX_CA" in symbols_dict:
         if "R4" not in violated:
             test_r4_chain = And(rules["R4"], rules["R10"], scenario_facts)
@@ -134,6 +142,7 @@ def find_violated_rules(scenario_facts):
 
 
 def get_rule_description(rule_name):
+    """Get human-readable description of a rule"""
     descriptions = {
         "R1": "TODAY → ¬FUTURE (Cannot be in both modes simultaneously)",
         "R2": "TELE_ACTIVE → FUTURE (TELe only available in future mode)",
@@ -142,7 +151,7 @@ def get_rule_description(rule_name):
         "R5": "SUSP_TM_EX → ¬USE_TM_EX (Suspended route cannot be used)",
         "R6": "CLOSED_T5 → ¬USE_SB_T5 (Closed T5 blocks SB-T5 route)",
         "R7": "TODAY → ¬USE_SB_T5 (SB-T5 not available in today mode)",
-        "R8": "TODAY → ¬USE_T5_TM (TM-T5 not available in today mode)",
+        "R8": "TODAY → ¬USE_PR_T5 (PR-T5 not available in today mode)",
         "R9a": "USE_SB_T5 → TELE_ACTIVE (SB-T5 requires TELe to be active)",
         "R9b": "USE_T5_TM → TELE_ACTIVE (TM-T5 requires TELe to be active)",
         "R10": "CLOSED_CA → ¬USE_EX_CA (Closed airport blocks EX-CA route)"
@@ -151,6 +160,7 @@ def get_rule_description(rule_name):
 
 
 def analyze_scenario(scenario_facts):
+    """Analyze a scenario and return result and violated rules"""
     combined_kb = And(knowledge, scenario_facts)
     is_sat = is_satisfiable(combined_kb)
     
@@ -165,6 +175,7 @@ def analyze_scenario(scenario_facts):
 
 
 def view_rules():
+    """Display all propositional logic rules"""
     print("\n" + "="*100)
     print("PROPOSITIONAL LOGIC RULES")
     print("="*100)
@@ -177,7 +188,7 @@ def view_rules():
         ("R5", "SUSP_TM_EX → ¬USE_TM_EX", "Suspended Tanah Merah to Expo route cannot be used"),
         ("R6", "CLOSED_T5 → ¬USE_SB_T5", "Closed Terminal 5 blocks Sungei Bedok to T5 route"),
         ("R7", "TODAY → ¬USE_SB_T5", "Sungei Bedok to T5 route not available in TODAY mode"),
-        ("R8", "TODAY → ¬USE_T5_TM", "Tanah Merah to T5 route not available in TODAY mode"),
+        ("R8", "TODAY → ¬USE_PR_T5", "Pasir Ris to T5 route not available in TODAY mode"),
         ("R9", "(USE_SB_T5 → TELE_ACTIVE) ∧ (USE_T5_TM → TELE_ACTIVE)", 
          "Both SB-T5 and TM-T5 routes require TELe to be active"),
         ("R10", "CLOSED_CA → ¬USE_EX_CA", "Closed Changi Airport blocks Expo to Changi route")
@@ -191,6 +202,7 @@ def view_rules():
 
 
 def view_scenarios():
+    """Display all scenarios with their details"""
     print("\n" + "="*100)
     print("ALL SCENARIOS")
     print("="*100)
@@ -205,10 +217,12 @@ def view_scenarios():
 
 
 def run_scenario_validation():
+    """Run validation on all scenarios and display results"""
     print("\n" + "="*100)
     print("SCENARIO VALIDATION RESULTS")
     print("="*100)
     
+    # Analyze all scenarios
     results = []
     for scenario in scenarios:
         result, violated_rules = analyze_scenario(scenario["facts"])
@@ -232,6 +246,7 @@ def run_scenario_validation():
 
 
 def display_menu():
+    """Display the main menu"""
     print("\n" + "="*100)
     print("MRT LOGIC INFERENCE SYSTEM - MAIN MENU")
     print("="*100)
@@ -244,6 +259,7 @@ def display_menu():
 
 
 def main():
+    """Main program loop"""
     print("="*100)
     print(" "*30 + "MRT LOGIC INFERENCE SYSTEM")
     print(" "*25 + "Propositional Logic Analysis Tool")
