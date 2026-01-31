@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/mnt/user-data/uploads')
+
 from logic import *
 
 
@@ -30,6 +33,58 @@ rules = {
 }
 
 knowledge = And(*rules.values())
+
+
+scenarios = [
+    {
+        "num": 1,
+        "description": "Using future route in today mode",
+        "mode": "Today",
+        "route": "Sungei Bedok to T5",
+        "advisories": "None",
+        "facts": And(TODAY, USE_SB_T5)
+    },
+    {
+        "num": 2,
+        "description": "Valid today mode route",
+        "mode": "Today",
+        "route": "Tanah Merah to Expo to Changi Airport",
+        "advisories": "None",
+        "facts": And(TODAY, USE_TM_EX, USE_EX_CA)
+    },
+    {
+        "num": 3,
+        "description": "Using route to closed station",
+        "mode": "Today",
+        "route": "Expo to Changi Airport",
+        "advisories": "CLOSED_CA",
+        "facts": And(TODAY, USE_EX_CA, CLOSED_CA)
+    },
+    {
+        "num": 4,
+        "description": "Valid future mode route",
+        "mode": "Future",
+        "route": "Sungei Bedok to T5",
+        "advisories": "None",
+        "facts": And(FUTURE, USE_SB_T5, TELE_ACTIVE)
+    },
+    {
+        "num": 5,
+        "description": "Route to station with works",
+        "mode": "Future",
+        "route": "Expo to Changi Airport",
+        "advisories": "WORKS_CHANGI",
+        "facts": And(FUTURE, USE_EX_CA, WORKS_CHANGI)
+    },
+    {
+        "num": 6,
+        "description": "Using suspended route",
+        "mode": "Future",
+        "route": "Tanah Merah to Expo",
+        "advisories": "SUSP_TM_EX",
+        "facts": And(FUTURE, USE_TM_EX, SUSP_TM_EX)
+    }
+]
 
 
 def is_satisfiable(kb):
@@ -109,69 +164,60 @@ def analyze_scenario(scenario_facts):
     return result, violated_rules
 
 
-def main():
-    scenarios = [
-        {
-            "num": 1,
-            "description": "Using future route in today mode",
-            "mode": "Today",
-            "route": "Sungei Bedok to T5",
-            "advisories": "None",
-            "facts": And(TODAY, USE_SB_T5)
-        },
-        {
-            "num": 2,
-            "description": "Valid today mode route",
-            "mode": "Today",
-            "route": "Tanah Merah to Expo to Changi Airport",
-            "advisories": "None",
-            "facts": And(TODAY, USE_TM_EX, USE_EX_CA)
-        },
-        {
-            "num": 3,
-            "description": "Using route to closed station",
-            "mode": "Today",
-            "route": "Expo to Changi Airport",
-            "advisories": "CLOSED_CA",
-            "facts": And(TODAY, USE_EX_CA, CLOSED_CA)
-        },
-        {
-            "num": 4,
-            "description": "Valid future mode route",
-            "mode": "Future",
-            "route": "Sungei Bedok to T5",
-            "advisories": "None",
-            "facts": And(FUTURE, USE_SB_T5, TELE_ACTIVE)
-        },
-        {
-            "num": 5,
-            "description": "Route to station with works",
-            "mode": "Future",
-            "route": "Expo to Changi Airport",
-            "advisories": "WORKS_CHANGI",
-            "facts": And(FUTURE, USE_EX_CA, WORKS_CHANGI)
-        },
-        {
-            "num": 6,
-            "description": "Using suspended route",
-            "mode": "Future",
-            "route": "Tanah Merah to Expo",
-            "advisories": "SUSP_TM_EX",
-            "facts": And(FUTURE, USE_TM_EX, SUSP_TM_EX)
-        }
+def view_rules():
+    print("\n" + "="*100)
+    print("PROPOSITIONAL LOGIC RULES")
+    print("="*100)
+    
+    rule_details = [
+        ("R1", "TODAY → ¬FUTURE", "Cannot be in both TODAY and FUTURE modes simultaneously"),
+        ("R2", "TELE_ACTIVE → FUTURE", "TELe is only available in FUTURE mode"),
+        ("R3", "CRL_ACTIVE → FUTURE", "CRL is only active in FUTURE mode"),
+        ("R4", "WORKS_CHANGI → CLOSED_CA", "Works at Changi closes the airport station"),
+        ("R5", "SUSP_TM_EX → ¬USE_TM_EX", "Suspended Tanah Merah to Expo route cannot be used"),
+        ("R6", "CLOSED_T5 → ¬USE_SB_T5", "Closed Terminal 5 blocks Sungei Bedok to T5 route"),
+        ("R7", "TODAY → ¬USE_SB_T5", "Sungei Bedok to T5 route not available in TODAY mode"),
+        ("R8", "TODAY → ¬USE_T5_TM", "Tanah Merah to T5 route not available in TODAY mode"),
+        ("R9", "(USE_SB_T5 → TELE_ACTIVE) ∧ (USE_T5_TM → TELE_ACTIVE)", 
+         "Both SB-T5 and TM-T5 routes require TELe to be active"),
+        ("R10", "CLOSED_CA → ¬USE_EX_CA", "Closed Changi Airport blocks Expo to Changi route")
     ]
+    
+    for rule_id, formula, description in rule_details:
+        print(f"\n{rule_id}: {formula}")
+        print(f"     → {description}")
+    
+    print("\n" + "="*100)
+
+
+def view_scenarios():
+    print("\n" + "="*100)
+    print("ALL SCENARIOS")
+    print("="*100)
+    
+    for scenario in scenarios:
+        print(f"\nScenario {scenario['num']}: {scenario['description']}")
+        print(f"  • Mode: {scenario['mode']}")
+        print(f"  • Route: {scenario['route']}")
+        print(f"  • Advisories: {scenario['advisories']}")
+    
+    print("\n" + "="*100)
+
+
+def run_scenario_validation():
+    print("\n" + "="*100)
+    print("SCENARIO VALIDATION RESULTS")
+    print("="*100)
     
     results = []
     for scenario in scenarios:
         result, violated_rules = analyze_scenario(scenario["facts"])
-        scenario["result"] = result
-        scenario["violated_rules"] = violated_rules
-        results.append(scenario)
+        scenario_result = scenario.copy()
+        scenario_result["result"] = result
+        scenario_result["violated_rules"] = violated_rules
+        results.append(scenario_result)
     
-    print("="*100)
-    print("MRT LOGIC INFERENCE - SCENARIO RESULTS")
-    print("="*100)
-    
+    # Display results
     for scenario in results:
         status = "✅ VALID" if scenario["result"] == "VALID" else "❌ CONTRADICTION"
         print(f"\nScenario {scenario['num']}: {status}")
@@ -182,8 +228,56 @@ def main():
             for rule_name in scenario["violated_rules"]:
                 print(f"    • {rule_name}: {get_rule_description(rule_name)}")
     
-    print("\n" + "="*100 + "\n")
+    print("\n" + "="*100)
 
+
+def display_menu():
+    print("\n" + "="*100)
+    print("MRT LOGIC INFERENCE SYSTEM - MAIN MENU")
+    print("="*100)
+    print("\nPlease select an option:")
+    print("  1. View All Rules")
+    print("  2. View All Scenarios")
+    print("  3. Run Scenario Validation")
+    print("  4. Exit")
+    print("\n" + "="*100)
+
+
+def main():
+    print("="*100)
+    print(" "*30 + "MRT LOGIC INFERENCE SYSTEM")
+    print(" "*25 + "Propositional Logic Analysis Tool")
+    print("="*100)
+    
+    while True:
+        display_menu()
+        
+        try:
+            choice = input("\nEnter your choice (1-4): ").strip()
+            
+            if choice == "1":
+                view_rules()
+            elif choice == "2":
+                view_scenarios()
+            elif choice == "3":
+                run_scenario_validation()
+            elif choice == "4":
+                print("\n" + "="*100)
+                print("Thank you for using the MRT Logic Inference System!")
+                print("="*100 + "\n")
+                break
+            else:
+                print("\n❌ Invalid choice. Please enter a number between 1 and 4.")
+        
+        except KeyboardInterrupt:
+            print("\n\n" + "="*100)
+            print("Program interrupted. Exiting...")
+            print("="*100 + "\n")
+            break
+        except Exception as e:
+            print(f"\n❌ An error occurred: {e}")
+            print("Please try again.")
+    
 
 if __name__ == "__main__":
     main()
