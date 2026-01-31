@@ -1,12 +1,6 @@
-"""
-MRT Logic Inference System - Compact Results Only (No Classes)
-Shows only the compact results list of scenarios
-"""
-
 from logic import *
 
 
-# Define all propositional symbols
 TODAY = Symbol("TODAY")
 FUTURE = Symbol("FUTURE")
 SUSP_TM_EX = Symbol("SUSP_TM_EX")
@@ -21,7 +15,6 @@ USE_EX_CA = Symbol("USE_EX_CA")
 USE_TM_EX = Symbol("USE_TM_EX")
 
 
-# Define individual rules for better tracking
 rules = {
     "R1": Implication(TODAY, Not(FUTURE)),
     "R2": Implication(TELE_ACTIVE, FUTURE),
@@ -36,18 +29,15 @@ rules = {
     "R10": Implication(CLOSED_CA, Not(USE_EX_CA))
 }
 
-# Combine all rules into knowledge base
 knowledge = And(*rules.values())
 
 
 def is_satisfiable(kb):
-    """Check if KB has at least one satisfying model"""
     symbols = kb.symbols()
     return try_find_model(kb, symbols, {})
 
 
 def try_find_model(kb, symbols, model):
-    """Try to find a satisfying model"""
     if not symbols:
         try:
             return kb.evaluate(model)
@@ -68,35 +58,27 @@ def try_find_model(kb, symbols, model):
 
 
 def find_violated_rules(scenario_facts):
-    """Find which rules are violated by the scenario"""
     violated = []
     
-    # Test each rule individually with scenario facts
     for rule_name, rule in rules.items():
         test_kb = And(rule, scenario_facts)
         if not is_satisfiable(test_kb):
             violated.append(rule_name)
     
-    # Special case: check for chains of implications
-    # For WORKS_CHANGI scenario, we need to check the full chain
     symbols_dict = {}
     for symbol in scenario_facts.symbols():
         symbols_dict[symbol] = True
     
-    # Check R4 + R10 chain for WORKS_CHANGI
     if "WORKS_CHANGI" in symbols_dict and "USE_EX_CA" in symbols_dict:
-        # WORKS_CHANGI → CLOSED_CA (R4) and CLOSED_CA → ¬USE_EX_CA (R10)
         if "R4" not in violated:
-            # Test if R4 implication leads to contradiction
             test_r4_chain = And(rules["R4"], rules["R10"], scenario_facts)
             if not is_satisfiable(test_r4_chain):
                 violated.extend(["R4", "R10"])
     
-    return sorted(list(set(violated)))  # Remove duplicates and sort
+    return sorted(list(set(violated)))
 
 
 def get_rule_description(rule_name):
-    """Get human-readable description of a rule"""
     descriptions = {
         "R1": "TODAY → ¬FUTURE (Cannot be in both modes simultaneously)",
         "R2": "TELE_ACTIVE → FUTURE (TELe only available in future mode)",
@@ -114,7 +96,6 @@ def get_rule_description(rule_name):
 
 
 def analyze_scenario(scenario_facts):
-    """Analyze a scenario and return result and violated rules"""
     combined_kb = And(knowledge, scenario_facts)
     is_sat = is_satisfiable(combined_kb)
     
@@ -129,7 +110,6 @@ def analyze_scenario(scenario_facts):
 
 
 def main():
-    # Define all scenarios as dictionaries
     scenarios = [
         {
             "num": 1,
@@ -181,7 +161,6 @@ def main():
         }
     ]
     
-    # Analyze all scenarios
     results = []
     for scenario in scenarios:
         result, violated_rules = analyze_scenario(scenario["facts"])
@@ -189,7 +168,6 @@ def main():
         scenario["violated_rules"] = violated_rules
         results.append(scenario)
     
-    # Print compact list format
     print("="*100)
     print("MRT LOGIC INFERENCE - SCENARIO RESULTS")
     print("="*100)
